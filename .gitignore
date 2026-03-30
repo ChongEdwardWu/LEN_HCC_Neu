@@ -1,0 +1,31 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Generated analysis outputs
+figures/
+results/
+*.rds
+*.loom
+*.h5
+*.h5ad
+*.xlsx
+*.csv
+*.tsv
+*.pdf
+*.png
+*.log
+
+# Local environments
+.venv/
+env/*.yml
+env/*.yaml
