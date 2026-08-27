@@ -61,85 +61,11 @@ LEN_HCC_Neu/
 9. `R/Analysis/Step5_Len_LENvsCTR_Figures.R`
    - Generates neutrophil-focused figure panels.
 
-### Independent downstream analyses
-
-Steps 6 and 7 are independent downstream branches. They do not require Step 5 and should be run from their specified saved objects.
-
 10. `R/Analysis/Step6_Len_Neu_query_native_display.R`
     - Recalculates a query-native neutrophil UMAP, performs de novo five-cluster analysis, retains upstream Ng state labels, transfers tumour-derived Xue et al. mouse neutrophil states, and calculates the Xue core-state maturation score.
 
 11. `R/Analysis/Step7_Len_CD45_lineage_remodeling.R`
     - Performs matched-background differential-expression analyses across eight immune lineages, identifies genes with concordant attenuation under PERK inhibition and myeloid Eif2ak3 deletion, runs GO Biological Process enrichment, and generates the myeloid and lymphoid Venn/GO displays.
-
-## Running the independent downstream analyses
-
-### Step 6: neutrophil state analysis
-
-Required query object:
-
-- a Seurat object containing `RNA` and `integrated` assays;
-- metadata columns `group`, `CellType_l1`, and `Ng_stage`;
-- the six groups `CTR`, `LEN`, `CTRnAMG`, `LENnAMG`, `CTRnKO`, and `LENnKO`;
-- the frozen manuscript set of 14,111 neutrophils.
-
-Required Xue reference object:
-
-- a mouse liver-tumour Seurat object with an `RNA` assay;
-- metadata columns `Sample`, `celltype`, `clusters`, and `tissue`;
-- 17,780 mouse mNeu cells for core-marker derivation and the 8,297-cell
-  pTMC/pTMK tumour-state reference used by the script.
-
-Example:
-
-```bash
-Rscript R/Analysis/Step6_Len_Neu_query_native_display.R \
-  --query /path/to/03_Len_Neu_NgMapping.rds \
-  --xue-reference /path/to/xue_mouse_liver_tumour_reference.rds \
-  --output-root /path/to/results/Step6_Len_Neu_query_native_display \
-  --run-id neu_state_analysis
-```
-
-The script writes a run-specific output directory containing figures, tables, the processed query object, parameter manifests, input checksums, and session information. It refuses to overwrite an existing run directory.
-
-### Step 7: CD45-positive lineage analysis
-
-Required input object:
-
-- an annotated CD45-positive Seurat object with joined `RNA` counts and log-normalized data layers;
-- metadata columns `group`, `rev_CellType_l1`, and `rev_CellType_l2`;
-- the same six group labels listed above;
-- at least 30 cells in every required lineage-by-group combination.
-
-The fixed lineages are `Neu`, `Mac`, `Mono`, `DC`, `CD8T`, `NonCD8_T`, `NK`, and `B`.
-
-Example:
-
-```bash
-Rscript R/Analysis/Step7_Len_CD45_lineage_remodeling.R \
-  --input /path/to/canonical_annotated_CD45_object.rds \
-  --outdir /path/to/results/Step7_Len_CD45_lineage_remodeling
-```
-
-The default input checksum is the canonical manuscript object checksum. Supply
-`--expected-md5 VALUE` for another frozen input. Use `--expected-md5 none` only
-when intentionally changing the input and independently revalidating the outputs.
-Existing named outputs are not replaced unless `--overwrite` is supplied.
-
-The script evaluates three matched-background contrasts within each lineage:
-
-- `LEN - CTR`;
-- `LENnAMG - CTRnAMG`;
-- `LENnKO - CTRnKO`.
-
-Genes detected in at least 10% of cells in any group within a lineage form the common testing universe for that lineage. Benjamini-Hochberg correction is applied within each lineage and contrast.
-
-For fold-change calculation, `FindMarkers()` receives an explicit mean function appropriate for log-normalized RNA data. Each fold change is also recalculated directly from the RNA data matrix and compared with the Seurat result as a numerical quality-control check.
-
-The attenuation sets are defined by prespecified effect-size criteria across the matched backgrounds. They are descriptive attenuation sets, not formal interaction or rescue tests.
-
-The output directory contains the analysis contract, input and output manifests,
-cell counts, tested-gene universes, differential-expression tables, fold-change
-quality-control results, attenuation sets, GO tables, figures, and session information.
 
 ## Main software dependencies
 
