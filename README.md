@@ -1,8 +1,8 @@
 # LEN_HCC_Neu
 
-Code repository for the single-cell RNA-seq, regulon, and neutrophil-state analyses used in the manuscript on **lenvatinib-induced neutrophil reprogramming and PERK-dependent immune exclusion in hepatocellular carcinoma (HCC)**.
+Analysis code for single-cell RNA sequencing, regulon, neutrophil-state, and lineage-resolved treatment-response analyses in a mouse hepatocellular carcinoma model treated with lenvatinib.
 
-This public repository contains the **sanitized analysis code** used for the scRNA-seq workflow, from CellBender-based preprocessing and quality control to Seurat integration, neutrophil reference mapping, pySCENIC regulon analysis, differential expression/GSEA, and figure generation.
+The repository contains path-sanitized code for preprocessing, quality control, Seurat integration, immune-cell annotation, neutrophil reference mapping, pySCENIC analysis, differential expression, enrichment analysis, and figure generation. Raw data and large external reference objects are not included.
 
 ## Repository structure
 
@@ -18,7 +18,9 @@ LEN_HCC_Neu/
 │       ├── Step2_Len_Clustering.R
 │       ├── Step3_Len_Neu_sub_clustering.R
 │       ├── Step4_Len_Neu_DEG.R
-│       └── Step5_Len_LENvsCTR_Figures.R
+│       ├── Step5_Len_LENvsCTR_Figures.R
+│       ├── Step6_Len_Neu_query_native_display.R
+│       └── Step7_Len_CD45_lineage_remodeling.R
 ├── python/
 │   └── run_SCENIC_mouse.py
 ├── shell/
@@ -28,127 +30,161 @@ LEN_HCC_Neu/
 └── README.md
 ```
 
-## Analysis overview
+## Analysis workflow
 
-The repository is organized as a sequential workflow:
+### Core workflow
 
-1. **CellBender preprocessing**
-   - `shell/run_cellbender_batch.sh`
+1. `shell/run_cellbender_batch.sh`
    - Runs `cellbender remove-background` on Cell Ranger raw-feature matrices.
 
-2. **Sample-level QC in SingleCellExperiment**
-   - `R/QC/scRNA_QC_loop_CB_step1.R`
-   - Reads CellBender-filtered HDF5 matrices, performs exploratory clustering, computes QC metrics, and calls doublets with `scDblFinder`.
+2. `R/QC/scRNA_QC_loop_CB_step1.R`
+   - Reads CellBender-filtered matrices, calculates sample-level quality-control metrics, performs exploratory clustering, and calls doublets with `scDblFinder`.
 
-3. **Final QC and Seurat conversion**
-   - `R/QC/scRNA_QC_loop_CB_step2.R`
-   - Applies final filtering, harmonizes gene symbols, computes cell-cycle scores, and creates sample-level Seurat objects with `SCTransform`.
+3. `R/QC/scRNA_QC_loop_CB_step2.R`
+   - Applies final filtering, harmonizes gene symbols, calculates cell-cycle scores, and creates sample-level Seurat objects with `SCTransform`.
 
-4. **Multi-sample SCT-RPCA integration**
-   - `R/Analysis/Step1_Len_Data_Integration.R`
-   - Integrates samples with Seurat reciprocal PCA, performs dimensionality reduction and graph-based clustering, and writes the integrated object.
+4. `R/Analysis/Step1_Len_Data_Integration.R`
+   - Performs multi-sample SCT-RPCA integration, dimensionality reduction, and graph-based clustering.
 
-5. **pySCENIC export/import**
-   - `R/Analysis/Step1_5_Len_pySCENIC.R`
-   - Exports merged raw RNA counts to LOOM format, imports pySCENIC outputs, and stores regulon activity as Seurat `AUC` and `Bin` assays.
-   - `python/run_SCENIC_mouse.py`
-   - Runs pySCENIC (`grnboost2` → `ctx` → `AUCell` → binarization) using external motif/ranking resources.
+5. `R/Analysis/Step1_5_Len_pySCENIC.R` and `python/run_SCENIC_mouse.py`
+   - Export merged RNA counts, run pySCENIC, and add regulon activity to the Seurat object.
 
-6. **Global immune annotation**
-   - `R/Analysis/Step2_Len_Clustering.R`
-   - Reuses the integrated clustering, performs broad immune annotation, and summarizes cluster composition.
+6. `R/Analysis/Step2_Len_Clustering.R`
+   - Assigns broad immune-cell annotations and summarizes cluster composition.
 
-7. **Neutrophil-focused state analysis**
-   - `R/Analysis/Step3_Len_Neu_sub_clustering.R`
-   - Subsets neutrophils, maps them to the Ng et al. neutrophil reference atlas, computes maturation scores with `UCell`, and builds neutrophil-specific signatures used in downstream analyses.
+7. `R/Analysis/Step3_Len_Neu_sub_clustering.R`
+   - Subsets neutrophils, maps discrete Ng et al. maturation states, and prepares the neutrophil object used by downstream analyses.
 
-8. **Group comparisons and enrichment analyses**
-   - `R/Analysis/Step4_Len_Neu_DEG.R`
-   - Performs neutrophil differential expression, regulon differential activity analysis, and GSEA using `fgsea` + `msigdbr`.
+8. `R/Analysis/Step4_Len_Neu_DEG.R`
+   - Performs neutrophil differential-expression, regulon-activity, score, and gene-set enrichment analyses.
 
-9. **Figure generation**
-   - `R/Analysis/Step5_Len_LENvsCTR_Figures.R`
-   - Generates neutrophil-focused plots used in the manuscript figures.
+9. `R/Analysis/Step5_Len_LENvsCTR_Figures.R`
+   - Generates neutrophil-focused figure panels.
+
+### Independent downstream analyses
+
+Steps 6 and 7 are independent downstream branches. They do not require Step 5 and should be run from their specified saved objects.
+
+10. `R/Analysis/Step6_Len_Neu_query_native_display.R`
+    - Recalculates a query-native neutrophil UMAP, performs de novo five-cluster analysis, retains upstream Ng state labels, transfers tumour-derived Xue et al. mouse neutrophil states, and calculates the Xue core-state maturation score.
+
+11. `R/Analysis/Step7_Len_CD45_lineage_remodeling.R`
+    - Performs matched-background differential-expression analyses across eight immune lineages, identifies genes with concordant attenuation under PERK inhibition and myeloid Eif2ak3 deletion, runs GO Biological Process enrichment, and generates the myeloid and lymphoid Venn/GO displays.
+
+## Running the independent downstream analyses
+
+### Step 6: neutrophil state analysis
+
+Required query object:
+
+- a Seurat object containing `RNA` and `integrated` assays;
+- metadata columns `group`, `CellType_l1`, and `Ng_stage`;
+- the six groups `CTR`, `LEN`, `CTRnAMG`, `LENnAMG`, `CTRnKO`, and `LENnKO`;
+- the frozen manuscript set of 14,111 neutrophils.
+
+Required Xue reference object:
+
+- a mouse liver-tumour Seurat object with an `RNA` assay;
+- metadata columns `Sample`, `celltype`, `clusters`, and `tissue`;
+- 17,780 mouse mNeu cells for core-marker derivation and the 8,297-cell
+  pTMC/pTMK tumour-state reference used by the script.
+
+Example:
+
+```bash
+Rscript R/Analysis/Step6_Len_Neu_query_native_display.R \
+  --query /path/to/03_Len_Neu_NgMapping.rds \
+  --xue-reference /path/to/xue_mouse_liver_tumour_reference.rds \
+  --output-root /path/to/results/Step6_Len_Neu_query_native_display \
+  --run-id neu_state_analysis
+```
+
+The script writes a run-specific output directory containing figures, tables, the processed query object, parameter manifests, input checksums, and session information. It refuses to overwrite an existing run directory.
+
+### Step 7: CD45-positive lineage analysis
+
+Required input object:
+
+- an annotated CD45-positive Seurat object with joined `RNA` counts and log-normalized data layers;
+- metadata columns `group`, `rev_CellType_l1`, and `rev_CellType_l2`;
+- the same six group labels listed above;
+- at least 30 cells in every required lineage-by-group combination.
+
+The fixed lineages are `Neu`, `Mac`, `Mono`, `DC`, `CD8T`, `NonCD8_T`, `NK`, and `B`.
+
+Example:
+
+```bash
+Rscript R/Analysis/Step7_Len_CD45_lineage_remodeling.R \
+  --input /path/to/canonical_annotated_CD45_object.rds \
+  --outdir /path/to/results/Step7_Len_CD45_lineage_remodeling
+```
+
+The default input checksum is the canonical manuscript object checksum. Supply
+`--expected-md5 VALUE` for another frozen input. Use `--expected-md5 none` only
+when intentionally changing the input and independently revalidating the outputs.
+Existing named outputs are not replaced unless `--overwrite` is supplied.
+
+The script evaluates three matched-background contrasts within each lineage:
+
+- `LEN - CTR`;
+- `LENnAMG - CTRnAMG`;
+- `LENnKO - CTRnKO`.
+
+Genes detected in at least 10% of cells in any group within a lineage form the common testing universe for that lineage. Benjamini-Hochberg correction is applied within each lineage and contrast.
+
+For fold-change calculation, `FindMarkers()` receives an explicit mean function appropriate for log-normalized RNA data. Each fold change is also recalculated directly from the RNA data matrix and compared with the Seurat result as a numerical quality-control check.
+
+The attenuation sets are defined by prespecified effect-size criteria across the matched backgrounds. They are descriptive attenuation sets, not formal interaction or rescue tests.
+
+The output directory contains the analysis contract, input and output manifests,
+cell counts, tested-gene universes, differential-expression tables, fold-change
+quality-control results, attenuation sets, GO tables, figures, and session information.
 
 ## Main software dependencies
 
-### R packages
+### R
+
 - `Seurat`, `SeuratObject`, `SeuratWrappers`
 - `SingleCellExperiment`, `scater`, `scran`, `scuttle`, `DropletUtils`
-- `scDblFinder`, `bluster`, `BiocSingular`
-- `SingleR`
-- `UCell`, `destiny`
-- `msigdbr`, `fgsea`
+- `scDblFinder`, `bluster`, `BiocSingular`, `BiocParallel`
+- `SingleR`, `UCell`, `destiny`, `presto`
 - `SCENIC`, `SCopeLoomR`
-- `openxlsx2`, `tidyverse`, `patchwork`, `ggplot2`
+- `msigdbr`, `fgsea`, `clusterProfiler`, `org.Mm.eg.db`, `AnnotationDbi`, `GOSemSim`
+- `tidyverse`, `Matrix`, `openxlsx2`, `patchwork`, `ggridges`, `ggVennDiagram`, `ragg`
 
-### Python / command-line tools
+### Python and command-line tools
+
 - `cellbender`
 - `pyscenic`
 - `loompy`
 - `pandas`
 
-## External inputs required
+Step 6 requires Seurat 5.1 or later.
 
-This repository is a **public, path-sanitized release**. Before running the workflow, replace placeholder paths in the scripts with local paths to your own files.
+## External inputs
 
-### Required inputs include:
-- Cell Ranger outputs
-- CellBender outputs
-- External pySCENIC reference resources:
-  - motif annotation table (`motifs*.tbl`)
-  - transcription factor list (`allTFs*.txt`)
-  - ranking databases (`*.feather`)
-- Processed Ng et al. neutrophil reference Seurat object (`GSE243466`-derived)
-- Ng et al. Table S1 gene list for maturation scoring
-- Additional gene-set resources used for specific supplemental analyses
+- Cell Ranger and CellBender outputs
+- pySCENIC motif annotations, transcription-factor lists, and ranking databases
+- a processed Ng et al. neutrophil reference object
+- the Ng et al. supplementary gene list used by the original Step 3 workflow
+- a processed Xue et al. mouse liver-tumour reference object
+- the annotated CD45-positive Seurat object required by Step 7
+- any additional gene-set resources referenced by the core workflow
 
-## Key placeholders to replace
+Replace placeholder paths in the core scripts and supply Step 6 and Step 7 paths through their command-line arguments.
 
-Examples of placeholders that must be updated before execution:
+## Reproducibility and inference boundaries
 
-- `path_to_project_root`
-- `path_to_data`
-- `path_to_cellranger_outputs`
-- `path_to_cellbender_output`
-- `path_to_conda_sh`
-- `path_to_scenic_reference`
-- `path_to_ng_reference_rds`
-- `path_to_ng_table_s1_xlsx`
-- `path_to_figs2a_moesm4_xlsx`
-- `path_to_immgen_reference_rdata`
-- `path_to_azimuth_human_reference_dir`
-- `path_to_azimuth_mouse_reference_dir`
+- Random seeds are fixed in the analysis scripts.
+- Step 6 verifies that reference mapping and de novo clustering do not alter the independently calculated query-native UMAP coordinates.
+- Step 7 records input checksums, parameters, session information, cell counts, tested-gene universes, and fold-change quality-control results.
+- Each experimental condition is represented by one pooled 10x library. Cell-level tests and adjusted P values are exploratory distributional summaries and do not provide treatment-level biological-replicate inference.
+- Cell-state proportions and score distributions are descriptive. The Step 7 attenuation criterion is not a formal interaction or rescue test.
 
-## Expected intermediate outputs
+## Repository scope
 
-Representative outputs generated by the pipeline include:
+This repository includes the computational analysis code used for the single-cell and neutrophil-state analyses. It does not include raw sequencing data, large external references, manuscript source files, or wet-lab analysis code unrelated to the single-cell workflow.
 
-- `04_R/QC/<sample>/01_QC_step1_<sample>.rds`
-- `04_R/QC/<sample>/02_QC_step2_<sample>_seu.rds`
-- `results/01_Len_Integration.rds`
-- `results/01.5_LEN_pySCENIC_results.rds`
-- `results/02_Annotation_LSK.rds`
-- `results/03_Len_Neu_NgMapping.rds`
-- `results/Step4_GroupDE_GSEA/`
-- `figures/final/`
+Refer to the manuscript Data and Code Availability section for accession numbers and data-sharing details.
 
-## Reproducibility notes
-
-- Random seeds are explicitly set in multiple scripts (`set.seed(123)` in R; `--seed 123` in pySCENIC/GRNBoost2 and binarization).
-- The public scripts were cleaned for release:
-  - personal absolute paths were replaced with placeholders;
-  - local logging / email notification code was removed;
-  - comments were translated or standardized;
-  - file names were simplified where possible.
-- Some helper code retained in the scripts is not essential for reproducing the final manuscript figures but reflects the original working analysis environment.
-
-## What this repository does and does not include
-
-This repository includes the **computational analysis code** used for the scRNA-seq and neutrophil-state analyses. It does **not** include:
-- raw sequencing data;
-- large external reference resources;
-- all wet-lab analysis scripts unrelated to scRNA-seq;
-- manuscript source files.
-
-Please refer to the manuscript Data and Code Availability section for accession numbers and data-sharing details.
