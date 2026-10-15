@@ -1,6 +1,6 @@
 # LEN_HCC_Neu
 
-Analysis code for mouse single-cell and bulk RNA sequencing and human nCounter immune-signature analyses in hepatocellular carcinoma treated with lenvatinib.
+Analysis code for mouse single-cell and bulk RNA sequencing, human nCounter immune signatures, spatial cell distances, and TCGA-LIHC survival analyses.
 
 The repository contains path-sanitized code for preprocessing, quality control, Seurat integration, immune-cell annotation, neutrophil reference mapping, pySCENIC analysis, differential expression, enrichment analysis, and figure generation.
 
@@ -18,6 +18,10 @@ LEN_HCC_Neu/
 │   │   ├── Step1_Human_nCounter_signature_scores.R
 │   │   ├── Step2_Human_PD_delta_heatmaps.R
 │   │   └── Step3_Human_PD_signature_ranking.R
+│   ├── Spatial/
+│   │   └── Distance_and_phenotype_analysis.R
+│   ├── Survival/
+│   │   └── KM_survival.R
 │   └── Analysis/
 │       ├── Step1_Len_Data_Integration.R
 │       ├── Step1_5_Len_pySCENIC.R
@@ -90,6 +94,24 @@ Rscript R/Human/Step3_Human_PD_signature_ranking.R "data/human/S1B_STable_PD_del
 
 Each script writes figures and supporting CSV tables to a new or empty output directory and records `sessionInfo.txt`.
 
+### Spatial distance analysis
+
+`R/Spatial/Distance_and_phenotype_analysis.R` calculates neutrophil-to-nearest-CD8Tc distances within each `QupathID` and scales them to the within-sample maximum (0–100). The input RDS contains `QupathID`, `SampleName`, `Cell ID` (or `CellID`), `Cell X Position`, `Cell Y Position`, and `Phenotype`, with labels `Neutrophil` and `CD8Tc`. It exports a distance CSV and session information.
+
+```bash
+Rscript R/Spatial/Distance_and_phenotype_analysis.R "data/spatial/cells.rds" "results/spatial"
+```
+
+### TCGA-LIHC survival analysis
+
+`R/Survival/KM_survival.R` combines CIBERSORT neutrophil fractions and PERK-UPR ssGSEA scores for Kaplan–Meier overall-survival analysis, using optimized cutpoints (`minprop = 0.3`) and 72-month follow-up. Inputs are a `log2(TPM + 1)` expression TSV (Ensembl IDs in the first column and TCGA sample barcodes as column names) and a survival TSV with `sample`, `OS` (0/1), and `OS.time` (days). It exports Kaplan–Meier PDFs, scores, groups, cutpoints, and session information.
+
+```bash
+Rscript R/Survival/KM_survival.R "data/TCGA-LIHC.star_tpm.tsv" "data/TCGA-LIHC.survival.tsv" "results/TCGA_LIHC"
+```
+
+Both scripts write to a new or empty output directory.
+
 ## Main software dependencies
 
 ### R
@@ -102,6 +124,8 @@ Each script writes figures and supporting CSV tables to a new or empty output di
 - `msigdbr`, `fgsea`, `clusterProfiler`, `org.Mm.eg.db`, `AnnotationDbi`, `GOSemSim`
 - `tidyverse`, `Matrix`, `openxlsx2`, `patchwork`, `ggridges`, `ggVennDiagram`, `ragg`
 - `readxl`, `ggplot2`, `pheatmap` (human nCounter workflow)
+- `phenoptr`, `rtree` (spatial distances)
+- `data.table`, `IOBR`, `GSVA`, `msigdbr`, `org.Hs.eg.db`, `AnnotationDbi`, `survival`, `survminer`, `maxstat`, `ggplot2` (TCGA-LIHC survival)
 
 ### Python and command-line tools
 
@@ -123,3 +147,4 @@ Step 6 requires Seurat 5.1 or later.
 - any additional gene-set resources referenced by the core workflow
 
 Replace placeholder paths in the core scripts and supply Step 6 and Step 7 paths through their command-line arguments.
+
