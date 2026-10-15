@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the archived release."
+type: software
+title: "LEN_HCC_Neu: analysis code for lenvatinib-associated immune remodeling in hepatocellular carcinoma"
+authors:
+  - family-names: "Lin"
+    given-names: "Huiling"
+  - family-names: "Wu"
+    given-names: "Chong"
+version: "1.0.0"
+date-released: "2026-10-15"
+license: MIT
+repository-code: "https://github.com/ChongEdwardWu/LEN_HCC_Neu"
+abstract: "Analysis workflows for mouse single-cell and bulk RNA sequencing, human nCounter immune signatures, spatial cell distances, and TCGA-LIHC overall survival."
